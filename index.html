@@ -1,0 +1,524 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>Servo Control</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Orbitron:wght@400;700;900&display=swap');
+
+  :root {
+    --bg: #080b0f;
+    --panel: #0d1117;
+    --panel2: #111820;
+    --border: #1c2733;
+    --accent: #00e5ff;
+    --accent2: #ff6b35;
+    --green: #39ff14;
+    --warn: #ffd600;
+    --text: #b0c8d8;
+    --dim: #3a5060;
+    --glow-c: 0 0 18px rgba(0,229,255,0.35);
+    --glow-o: 0 0 18px rgba(255,107,53,0.35);
+    --glow-g: 0 0 12px rgba(57,255,20,0.4);
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Share Tech Mono', monospace;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 0 14px 30px;
+    background-image:
+      radial-gradient(ellipse 60% 40% at 10% 0%, rgba(0,229,255,0.06) 0%, transparent 70%),
+      radial-gradient(ellipse 50% 35% at 90% 100%, rgba(255,107,53,0.06) 0%, transparent 70%);
+  }
+
+  /* ── Header ── */
+  header {
+    width: 100%; max-width: 440px;
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 18px 0 16px;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 18px;
+  }
+  h1 {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 1rem; font-weight: 900;
+    letter-spacing: 4px; color: var(--accent);
+    text-shadow: var(--glow-c);
+  }
+  .hdr-right { display: flex; align-items: center; gap: 8px; }
+  #statusText { font-size: 0.65rem; letter-spacing: 2px; color: var(--dim); transition: color .3s; }
+  #statusDot {
+    width: 9px; height: 9px; border-radius: 50%;
+    background: var(--dim); transition: all .3s;
+  }
+  #statusDot.online { background: var(--green); box-shadow: var(--glow-g); }
+  #statusDot.error  { background: var(--accent2); box-shadow: var(--glow-o); }
+
+  /* ── Card ── */
+  .card {
+    width: 100%; max-width: 440px;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 18px 18px 20px;
+    margin-bottom: 14px;
+    position: relative; overflow: hidden;
+  }
+  .card::after {
+    content: '';
+    position: absolute; top: 0; left: 10%; right: 10%; height: 1px;
+    background: linear-gradient(90deg, transparent, var(--accent), transparent);
+    opacity: .25;
+  }
+  .card-title {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 0.58rem; letter-spacing: 3px;
+    color: var(--dim); margin-bottom: 14px;
+    text-transform: uppercase;
+  }
+
+  /* ── IP row ── */
+  .ip-row { display: flex; gap: 8px; }
+  input[type="text"] {
+    flex: 1;
+    background: var(--bg); border: 1px solid var(--border);
+    border-radius: 8px; color: var(--accent);
+    font-family: 'Share Tech Mono', monospace; font-size: .95rem;
+    padding: 10px 13px; outline: none; transition: border-color .2s, box-shadow .2s;
+  }
+  input[type="text"]:focus { border-color: var(--accent); box-shadow: var(--glow-c); }
+
+  .btn {
+    background: transparent;
+    border: 1px solid var(--accent); color: var(--accent);
+    font-family: 'Orbitron', sans-serif; font-size: .6rem; letter-spacing: 2px;
+    padding: 10px 15px; border-radius: 8px; cursor: pointer;
+    transition: all .2s; white-space: nowrap; user-select: none;
+  }
+  .btn:hover  { background: rgba(0,229,255,.1); box-shadow: var(--glow-c); }
+  .btn:active { transform: scale(.96); }
+  .btn.o { border-color: var(--accent2); color: var(--accent2); }
+  .btn.o:hover { background: rgba(255,107,53,.1); box-shadow: var(--glow-o); }
+  .btn.r { border-color: #e53935; color: #e53935; }
+  .btn.r:hover { background: rgba(229,57,53,.1); }
+  .btn.full { width: 100%; padding: 14px; font-size: .7rem; margin-top: 6px; }
+
+  /* ── Gauge ── */
+  .gauge-wrap { display: flex; justify-content: center; margin-bottom: 10px; }
+  svg.gauge { overflow: visible; }
+
+  /* ── Angle display ── */
+  .angle-display {
+    text-align: center; margin: 6px 0 14px;
+    font-family: 'Orbitron', sans-serif;
+    font-size: 3.2rem; font-weight: 900; line-height: 1;
+    color: var(--accent); text-shadow: var(--glow-c);
+  }
+  .angle-display .unit { font-size: 1.1rem; color: var(--dim); }
+
+  /* ── Slider ── */
+  input[type="range"] {
+    -webkit-appearance: none; width: 100%; height: 5px;
+    border-radius: 3px; outline: none; cursor: pointer;
+    background: linear-gradient(90deg,
+      var(--accent) calc(var(--pct,0) * 1%),
+      var(--border) calc(var(--pct,0) * 1%));
+  }
+  input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none; width: 28px; height: 28px;
+    border-radius: 50%; background: var(--bg);
+    border: 2px solid var(--accent); box-shadow: var(--glow-c);
+    cursor: pointer; transition: transform .1s;
+  }
+  input[type="range"]:active::-webkit-slider-thumb { transform: scale(1.25); }
+
+  /* ── Presets ── */
+  .presets { display: flex; gap: 7px; margin-top: 14px; }
+  .prs {
+    flex: 1; background: var(--bg); border: 1px solid var(--border);
+    color: var(--dim); font-family: 'Share Tech Mono', monospace;
+    font-size: .82rem; padding: 8px 4px; border-radius: 8px;
+    cursor: pointer; transition: all .2s; text-align: center; user-select: none;
+  }
+  .prs:hover { border-color: var(--accent); color: var(--accent); }
+  .prs:active { transform: scale(.95); }
+
+  /* ── Timer inputs ── */
+  .timer-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 4px; }
+  .inp-grp label {
+    display: block; font-size: .6rem; letter-spacing: 2px;
+    color: var(--dim); margin-bottom: 6px; text-transform: uppercase;
+  }
+  input[type="number"] {
+    width: 100%; background: var(--bg);
+    border: 1px solid var(--border); border-radius: 8px;
+    color: var(--accent2); font-family: 'Share Tech Mono', monospace;
+    font-size: 1.05rem; padding: 10px 13px; outline: none;
+    transition: border-color .2s, box-shadow .2s;
+  }
+  input[type="number"]:focus { border-color: var(--accent2); box-shadow: var(--glow-o); }
+
+  /* unit toggle */
+  .unit-toggle { display: flex; gap: 6px; margin-bottom: 14px; }
+  .utab {
+    flex: 1; background: var(--bg); border: 1px solid var(--border);
+    color: var(--dim); font-family: 'Orbitron', sans-serif;
+    font-size: .55rem; letter-spacing: 2px; padding: 7px;
+    border-radius: 7px; cursor: pointer; text-align: center;
+    transition: all .2s; user-select: none;
+  }
+  .utab.active { border-color: var(--accent2); color: var(--accent2); background: rgba(255,107,53,.08); }
+
+  /* ── Countdown display ── */
+  #countdownBox {
+    display: none;
+    background: var(--panel2); border: 1px solid var(--border);
+    border-radius: 10px; padding: 14px 16px; margin-top: 10px;
+  }
+  .cd-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+  .cd-label { font-size: .62rem; letter-spacing: 2px; color: var(--dim); }
+  #cdTime {
+    font-family: 'Orbitron', sans-serif; font-size: 1.6rem; font-weight: 700;
+    color: var(--warn); text-shadow: 0 0 14px rgba(255,214,0,.4);
+    letter-spacing: 2px;
+  }
+  #cdTarget { font-size: .85rem; color: var(--accent2); }
+  .progress-track {
+    height: 4px; background: var(--border); border-radius: 2px; overflow: hidden;
+  }
+  #progressFill {
+    height: 100%; width: 0%;
+    background: linear-gradient(90deg, var(--accent2), var(--warn));
+    border-radius: 2px; transition: width .25s linear;
+  }
+
+  /* ── Log ── */
+  #log {
+    font-size: .7rem; color: var(--dim); line-height: 1.9;
+    max-height: 130px; overflow-y: auto;
+  }
+  #log .entry { display: flex; gap: 8px; }
+  #log .ts  { color: var(--accent); opacity: .4; flex-shrink: 0; }
+  #log .ok  { color: var(--green); }
+  #log .err { color: var(--accent2); }
+  #log .inf { color: var(--warn); }
+
+  @keyframes blink { 0%,100%{opacity:1} 50%{opacity:.3} }
+  .blink { animation: blink 1s infinite; }
+</style>
+</head>
+<body>
+
+<!-- Header -->
+<header>
+  <h1>SERVO CTRL</h1>
+  <div class="hdr-right">
+    <span id="statusText">OFFLINE</span>
+    <div id="statusDot"></div>
+  </div>
+</header>
+
+<!-- Connection -->
+<div class="card">
+  <div class="card-title">// ESP8266 Address</div>
+  <div class="ip-row">
+    <input type="text" id="ipInput" placeholder="192.168.1.x" value="192.168.1.100">
+    <button class="btn" onclick="ping()">PING</button>
+  </div>
+</div>
+
+<!-- Manual Slider -->
+<div class="card">
+  <div class="card-title">// Manual Control</div>
+
+  <div class="gauge-wrap">
+    <svg class="gauge" width="230" height="135" viewBox="0 0 230 135">
+      <defs>
+        <filter id="fg">
+          <feGaussianBlur stdDeviation="2.5" result="b"/>
+          <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+        </filter>
+        <filter id="fn">
+          <feGaussianBlur stdDeviation="2" result="b"/>
+          <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+        </filter>
+      </defs>
+      <path id="arcBg" stroke="var(--border)" stroke-width="7" fill="none"/>
+      <path id="arcFill" stroke="var(--accent)" stroke-width="7" fill="none"
+            stroke-linecap="round" filter="url(#fg)" style="display:none"/>
+      <line id="needle" x1="115" y1="118" x2="115" y2="42"
+            stroke="var(--accent2)" stroke-width="3" stroke-linecap="round" filter="url(#fn)"/>
+      <circle cx="115" cy="118" r="6" fill="var(--bg)" stroke="var(--accent)" stroke-width="2"/>
+      <text x="18"  y="125" fill="var(--dim)" font-size="10" font-family="Share Tech Mono">0°</text>
+      <text x="190" y="125" fill="var(--dim)" font-size="10" font-family="Share Tech Mono">180°</text>
+      <text x="105" y="16"  fill="var(--dim)" font-size="10" font-family="Share Tech Mono">90°</text>
+    </svg>
+  </div>
+
+  <div class="angle-display"><span id="angleVal">0</span><span class="unit">°</span></div>
+
+  <input type="range" id="slider" min="0" max="180" value="0"
+         oninput="onSlider(this.value)" onchange="sendAngle(this.value)">
+
+  <div class="presets">
+    <div class="prs" onclick="setAngle(0)">0°</div>
+    <div class="prs" onclick="setAngle(45)">45°</div>
+    <div class="prs" onclick="setAngle(90)">90°</div>
+    <div class="prs" onclick="setAngle(135)">135°</div>
+    <div class="prs" onclick="setAngle(180)">180°</div>
+  </div>
+</div>
+
+<!-- Timer Card -->
+<div class="card">
+  <div class="card-title">// Delayed Rotation Timer</div>
+
+  <!-- Unit toggle: mins / secs -->
+  <div class="unit-toggle">
+    <div class="utab active" id="tab-min" onclick="setUnit('min')">MINUTES</div>
+    <div class="utab"        id="tab-sec" onclick="setUnit('sec')">SECONDS</div>
+  </div>
+
+  <div class="timer-grid">
+    <div class="inp-grp">
+      <label>Target Angle (°)</label>
+      <input type="number" id="timerAngle" min="0" max="180" value="90">
+    </div>
+    <div class="inp-grp">
+      <label id="delayLabel">Delay (mins)</label>
+      <input type="number" id="timerDelay" min="1" max="999" value="5">
+    </div>
+  </div>
+
+  <button class="btn o full" onclick="startTimer()">▶ SET TIMER</button>
+  <button class="btn r full" id="cancelBtn" onclick="cancelTimer()" style="display:none">✕ CANCEL TIMER</button>
+
+  <!-- Live countdown -->
+  <div id="countdownBox">
+    <div class="cd-row">
+      <span class="cd-label">FIRES IN</span>
+      <span id="cdTime">00:00</span>
+    </div>
+    <div class="cd-row" style="margin-bottom:8px">
+      <span class="cd-label">TARGET</span>
+      <span id="cdTarget">—</span>
+    </div>
+    <div class="progress-track"><div id="progressFill"></div></div>
+  </div>
+</div>
+
+<!-- Log -->
+<div class="card">
+  <div class="card-title">// Command Log</div>
+  <div id="log">
+    <div class="entry"><span class="ts">--:--:--</span><span>Waiting for connection…</span></div>
+  </div>
+</div>
+
+<script>
+// ─── Gauge ───
+const R = 94, CX = 115, CY = 118;
+
+function polarXY(deg) {
+  const rad = Math.PI - (deg / 180) * Math.PI;
+  return { x: CX + R * Math.cos(rad), y: CY - R * Math.sin(rad) };
+}
+function arcPath(a, b) {
+  const s = polarXY(a), e = polarXY(b);
+  const lg = (b - a) > 180 ? 1 : 0;
+  return `M${s.x} ${s.y} A${R} ${R} 0 ${lg} 1 ${e.x} ${e.y}`;
+}
+
+document.getElementById('arcBg').setAttribute('d', arcPath(0, 180));
+
+function updateGauge(deg) {
+  const fill   = document.getElementById('arcFill');
+  const needle = document.getElementById('needle');
+  if (deg > 0) { fill.setAttribute('d', arcPath(0, deg)); fill.style.display = ''; }
+  else { fill.style.display = 'none'; }
+  const p = polarXY(deg);
+  const dx = p.x - CX, dy = p.y - CY;
+  const len = Math.sqrt(dx*dx + dy*dy);
+  const scale = 72 / len;
+  needle.setAttribute('x2', CX + dx * scale);
+  needle.setAttribute('y2', CY + dy * scale);
+}
+updateGauge(0);
+
+// ─── Slider ───
+function onSlider(v) {
+  document.getElementById('angleVal').textContent = v;
+  document.getElementById('slider').style.setProperty('--pct', v / 180 * 100);
+  updateGauge(+v);
+}
+
+function setAngle(v) {
+  document.getElementById('slider').value = v;
+  onSlider(v);
+  sendAngle(v);
+}
+
+// ─── Unit toggle ───
+let unit = 'min';
+function setUnit(u) {
+  unit = u;
+  document.getElementById('tab-min').classList.toggle('active', u === 'min');
+  document.getElementById('tab-sec').classList.toggle('active', u === 'sec');
+  document.getElementById('delayLabel').textContent = u === 'min' ? 'Delay (mins)' : 'Delay (secs)';
+}
+
+// ─── IP helper ───
+const ip = () => document.getElementById('ipInput').value.trim();
+
+// ─── API ───
+async function sendAngle(angle) {
+  try {
+    const r = await fetch(`http://${ip()}/angle?value=${angle}`);
+    const d = await r.json();
+    setOnline();
+    addLog(`SET ${d.angle}°`, 'ok');
+  } catch {
+    setError(); addLog(`Could not reach ${ip()}`, 'err');
+  }
+}
+
+async function ping() {
+  addLog(`Pinging ${ip()}…`);
+  try {
+    const r = await fetch(`http://${ip()}/status`);
+    const d = await r.json();
+    setOnline();
+    addLog(`PONG — servo at ${d.angle}°` + (d.timerActive ? `, timer active (${Math.ceil(d.remainingMs/1000)}s left)` : ''), 'ok');
+    document.getElementById('slider').value = d.angle;
+    onSlider(d.angle);
+    if (d.timerActive && d.remainingMs > 0) {
+      restoreCountdown(d.remainingMs, d.targetAngle);
+    }
+  } catch {
+    setError(); addLog(`No response from ${ip()}`, 'err');
+  }
+}
+
+// ─── Timer ───
+let cdInterval = null;
+let cdTotalMs  = 0;
+let cdEndAt    = 0;
+
+async function startTimer() {
+  const angle = parseInt(document.getElementById('timerAngle').value);
+  const delayVal = parseInt(document.getElementById('timerDelay').value);
+  if (isNaN(angle) || isNaN(delayVal) || delayVal < 1) {
+    addLog('Invalid timer values', 'err'); return;
+  }
+  const delayMs = unit === 'min' ? delayVal * 60000 : delayVal * 1000;
+
+  try {
+    const r = await fetch(`http://${ip()}/timer?angle=${angle}&delay=${delayMs}`);
+    const d = await r.json();
+    setOnline();
+    const label = unit === 'min'
+      ? `${delayVal} min${delayVal>1?'s':''}`
+      : `${delayVal} sec${delayVal>1?'s':''}`;
+    addLog(`TIMER SET: →${angle}° after ${label}`, 'inf');
+    startCountdownUI(delayMs, angle);
+  } catch {
+    setError(); addLog('Timer command failed', 'err');
+  }
+}
+
+async function cancelTimer() {
+  try {
+    await fetch(`http://${ip()}/cancel`);
+  } catch {}
+  stopCountdownUI();
+  addLog('Timer cancelled', 'err');
+}
+
+function startCountdownUI(totalMs, targetAngle) {
+  cdTotalMs = totalMs;
+  cdEndAt   = Date.now() + totalMs;
+  document.getElementById('cdTarget').textContent = `→ ${targetAngle}°`;
+  showCountdown(true);
+  tickCountdown();
+  cdInterval = setInterval(tickCountdown, 250);
+}
+
+function restoreCountdown(remainingMs, targetAngle) {
+  cdTotalMs = remainingMs; // approximate
+  cdEndAt   = Date.now() + remainingMs;
+  document.getElementById('cdTarget').textContent = `→ ${targetAngle}°`;
+  showCountdown(true);
+  tickCountdown();
+  cdInterval = setInterval(tickCountdown, 250);
+}
+
+function tickCountdown() {
+  const rem = Math.max(0, cdEndAt - Date.now());
+  const pct = Math.min(100, ((cdTotalMs - rem) / cdTotalMs) * 100);
+  document.getElementById('progressFill').style.width = pct + '%';
+
+  const totalSec = Math.ceil(rem / 1000);
+  const m = Math.floor(totalSec / 60);
+  const s = totalSec % 60;
+  document.getElementById('cdTime').textContent =
+    String(m).padStart(2,'0') + ':' + String(s).padStart(2,'0');
+
+  if (rem <= 0) {
+    clearInterval(cdInterval); cdInterval = null;
+    document.getElementById('cdTime').textContent = '00:00';
+    document.getElementById('progressFill').style.width = '100%';
+    addLog('Timer fired — servo moved!', 'ok');
+    setTimeout(() => {
+      stopCountdownUI();
+      // Refresh servo angle from ESP
+      fetch(`http://${ip()}/status`).then(r=>r.json()).then(d=>{
+        document.getElementById('slider').value = d.angle;
+        onSlider(d.angle);
+      }).catch(()=>{});
+    }, 1200);
+  }
+}
+
+function stopCountdownUI() {
+  if (cdInterval) { clearInterval(cdInterval); cdInterval = null; }
+  showCountdown(false);
+}
+
+function showCountdown(show) {
+  document.getElementById('countdownBox').style.display = show ? 'block' : 'none';
+  document.getElementById('cancelBtn').style.display    = show ? 'block' : 'none';
+}
+
+// ─── Status indicators ───
+function setOnline() {
+  document.getElementById('statusDot').className  = 'online';
+  document.getElementById('statusText').textContent = 'ONLINE';
+  document.getElementById('statusText').style.color = 'var(--green)';
+}
+function setError() {
+  document.getElementById('statusDot').className  = 'error';
+  document.getElementById('statusText').textContent = 'ERROR';
+  document.getElementById('statusText').style.color = 'var(--accent2)';
+}
+
+// ─── Log ───
+function addLog(msg, cls = '') {
+  const log = document.getElementById('log');
+  const ts  = new Date().toTimeString().slice(0,8);
+  const el  = document.createElement('div');
+  el.className = 'entry';
+  el.innerHTML = `<span class="ts">${ts}</span><span class="${cls}">${msg}</span>`;
+  log.insertBefore(el, log.firstChild);
+  while (log.children.length > 25) log.removeChild(log.lastChild);
+}
+</script>
+</body>
+</html>
