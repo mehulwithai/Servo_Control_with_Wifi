@@ -226,11 +226,20 @@
   </div>
 </header>
 
+
+<!-- AP Info Banner -->
+<div style="width:100%;max-width:440px;background:rgba(57,255,20,0.06);border:1px solid rgba(57,255,20,0.2);border-radius:10px;padding:11px 16px;margin-bottom:14px;font-size:0.7rem;line-height:1.8;color:#39ff14;">
+  <span style="font-family:'Orbitron',sans-serif;font-size:0.6rem;letter-spacing:2px;opacity:0.7;">// HOW TO CONNECT</span><br>
+  1. Connect phone WiFi to <strong>ServoControl</strong><br>
+  2. Password: <strong>servo1234</strong><br>
+  3. ESP address is always <strong>192.168.4.1</strong><br>
+  <span style="color:var(--warn);">⚡ Timer runs even after you close this app</span>
+</div>
 <!-- Connection -->
 <div class="card">
-  <div class="card-title">// ESP8266 Address</div>
+  <div class="card-title">// ESP32 Address</div>
   <div class="ip-row">
-    <input type="text" id="ipInput" placeholder="192.168.1.x" value="192.168.1.100">
+    <input type="text" id="ipInput" placeholder="192.168.4.1" value="192.168.4.1">
     <button class="btn" onclick="ping()">PING</button>
   </div>
 </div>
